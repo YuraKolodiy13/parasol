@@ -14,6 +14,45 @@
 
 <body>
 <h1> Lower Rio Grande Valley case study </h1>
+
+<!--------------------------------------------------------------->
+<p>
+  <button id="reset_brushes">Reset Brushes</button>
+  <button id="keep_brushed">Keep Brushed Data</button>
+  <button id="remove_brushed">Remove Brushed Data</button>
+  <button id="export_brushed">Export Brushed Data</button>
+</p>
+<!------------------------------------------------------------->
+
+<!----------------------------------------------------------->
+<p>
+  <div id="clusteringVars"> Variables to include in clustering: <br>
+  </div>
+  <label for="nClust" style="display: inline-block; text-align: left;">
+    Clusters: <span id="nClust-value"></span>
+  </label>
+  <input type="range" min="2" max="10" id="nClust">
+  <p> <i>Note: clustering is updated every time slider changes</i>. </p>
+</p>
+<!-------------------------------------------------->
+
+
+<!--------------------------------------------------------------->
+
+<div style="width: 100%; overflow: hidden;">
+  <div id="rangeList"></div>
+  <br> <button id="apply_weights"> <b> Apply Weights </b> </button>
+  Curve smoothness: <br> <input type="range" min="0" max="25" value="0" id="smoothness"> <br>
+  Bundling strength for clusters: <br> <input type="range" min="0" max="100" value="0" id="bundling" disabled> not working <br>
+
+</div> <br>
+
+<!------------------------------------------------------------------>
+
+
+
+<div style="width: 400px; float: left;">
+</div>
 <div style="width: 200px; float: left;">
   <i>Clustering variables:</i> <br>
   <input type="checkbox" id="obj_box" checked/> Objectives <br>
@@ -34,7 +73,7 @@
 </div>
 <h2> Decisions </h2>
 <div class="container">
-  <div id="p1" class="parcoords" style="height:300px; width:2000px;"></div>
+  <div id="p1" class="parcoords" style="height:300px; width:3000px;"></div>
 </div>
 <div id="grid" style="width:100%;height:700px;" class="slickgrid-container"></div>
 </body>
@@ -51,64 +90,59 @@
 
   // read in data and create visualization
   d3.csv('dataMOEDURBESTrev.csv')
-    // return {  // TODO: find more efficient way to convert strings to numbers
-    //   rel: +data.rel,
-    //   crit_rel: +data.crit_rel,
-    //   num_leases: +data.num_leases,
-    //   surplus: +data.surplus,
-    //   drop: +data.drop,
-    //   cost: +data.cost,
-    //   cost_var: +data.cost_var,
-    //   dr_trans: +data.dr_trans,
-    //   rights: +data.rights,
-    //   options_low: +data.options_low,
-    //   options_high: +data.options_high,
-    //   xi: +data.xi,
-    //   alpha: +data.alpha,
-    //   beta: +data.beta,
-    //   alpha2: +data.alpha2,
-    //   beta2: +data.beta2
-    // };
-    // }).then(function(data) {
     .then(function(data) {
+      // Create a parent div for the checkboxes
+      const checkboxList = document.createElement("ul");
+      const rangeList = document.createElement("ul");
+      // Create checkboxes
+      [...decisionsHeaders, ...objectivesHeaders].forEach(item => {
+        const checkboxEl = document.createElement('li');
+        const rangeEl = document.createElement('li');
+        checkboxEl.innerHTML = `<input type="checkbox" id=${item} checked> ${item}`
+        rangeEl.innerHTML = `<form onSubmit="return false;">
+          ${item} - weight: <br>
+          <input type="number" id="${item}_text" step="0.01" min="0" max="1"
+            value="0.5" onchange="onChangeWeight(${item}_slider, this.value)">
+          <input type="range" id=${item}_slider step="0.01" min="0" max="1"
+            value="0.5" onchange="onChangeWeight(${item}_text, this.value)">
+        </form>`
+        checkboxList.appendChild(checkboxEl);
+        rangeList.appendChild(rangeEl);
+      });
+      document.querySelector('#clusteringVars').append(checkboxList);
+      document.querySelector('#rangeList').append(rangeList);
 
+      const k = 3;
+      update_cluster_slider(k);
+      const cluster_vars = d3.keys(data[0]).filter(function(key) {
+        return key !== 'name';
+      });
       // specify layout
-      var axes_to_hide = {
-        0: decisionsHeaders,  // hidden from first plot
-        1: objectivesHeaders // hidden from second plot
+      const layout = {
+        0: objectivesHeaders,
+        1: decisionsHeaders
       }
 
       // create Parasol object, add grid, link, and perform clustering
-      var ps = Parasol(data)('.parcoords')
+      const ps = Parasol(data)('.parcoords')
         .attachGrid({container: '#grid'})
         .linked()
-        .hideAxes(axes_to_hide)
-        .cluster({k: 3, hidden: true})
+        .cluster({k, vars: cluster_vars, hidden: false})
+        .setAxesLayout(layout)
         .alpha(0.45)  // change transparency
         .reorderable()  // make axes dynamically reorderable
-        // .flipAxes('rel. (-)')
-        // .flip('crit. rel. (-)')
         .render()
 
-      // scale decisions appropriately
-      // TODO: don't hardcode these scales - calculate maximum value
-      console.log(ps.charts, 'ps.charts')
-      // ps.charts[1].scale('X1', [0, 20533])
-      //   .scale('X2', [0, 20533])
-      //   .scale('X3', [0.97, 2.043])
-      //   .scale('X4', [0.97, 2.043])
-      //   .scale('X5', [0.97, 2.043])
-      //   .scale('X6', [0.97, 2.043])
 
       // update clusters and slider text when slider changes
       d3.select('#cluster_button').on('click', function() {
-        var cluster_vars = get_cluster_vars();  // get variables for clustering from checkboxes
-        ps.cluster({k: 3, vars: cluster_vars, hidden: true});
+        const cluster_vars = get_cluster_vars();  // get variables for clustering from checkboxes
+        ps.cluster({k: 3, vars: cluster_vars, hidden: false});
       });
 
       // export data
       d3.select('#export_button').on('click', function() {
-        var selection = document.querySelector('input[name="export_selection"]:checked').value
+        const selection = document.querySelector('input[name="export_selection"]:checked').value
 
         if (selection === "brushed") {
           ps.exportData(type=selection);
@@ -116,25 +150,67 @@
           ps.exportData(type=selection);
         }
       });
+
+      // activate buttons
+      d3.select('#reset_brushes').on('click', function() {
+        ps.resetSelections('brushed')
+      });
+      d3.select('#keep_brushed').on('click', function() {
+        ps.keepData('brushed')
+      });
+      d3.select('#remove_brushed').on('click', function() {
+        ps.removeData('brushed')
+      });
+      d3.select('#export_brushed').on('click', function() {
+        ps.exportData('brushed')  // will export as 'parasol_data.csv' as default
+      });
+
+      // update clusters and slider text when slider changes
+      d3.select('#nClust').on('input', function() {
+        update_cluster_slider(+this.value);  // update slider text
+        const checked_vars = get_checked_vars();  // get checked variables for clustering
+        ps.cluster({k: parseInt(this.value), vars: checked_vars, hidden: true});
+      });
+
+      // apply weights
+      d3.select('#apply_weights').on('click', function() {
+        // setup weights (unspecified vars given weight = 0)
+        const weights = [...decisionsHeaders, ...objectivesHeaders].reduce((acc, item) => {
+          acc[`${item}`] = d3.select(`#${item}_slider`).property("value");
+          return acc;
+        }, {})
+
+        ps.weightedSum({ weights: weights }).render();
+      });
+
+      // bundling strength slider
+      d3.select('#bundling').on('input', function() {
+        ps.bundlingStrength(this.value/100)
+          .bundleDimension('cluster')
+          .render();  // divide by a hundred to get decimals
+      });
+
+      // smoothness
+      d3.select("#smoothness").on('input', function() {
+        ps.smoothness(this.value/100).render();  // divide by a hundred to get decimals
+      });
     });
 
   function get_cluster_vars() {
-    // create an array of variables that are checked for clustering
-    var checked_vars = [];
-    var checkbox_ids = ["#obj_box", "#dec_box"];
-    var obj_names = objectivesHeaders;
-    var dec_names = decisionsHeaders;
+    const checked_vars = [];
+    const checkbox_ids = ["#obj_box", "#dec_box"];
+    const obj_names = objectivesHeaders;
+    const dec_names = decisionsHeaders;
 
-    // get whether each checkbox is checked, if so, add variables to cluster_vars
     // include objectives, if checked
     if (d3.select(checkbox_ids[0]).property("checked") === true) {
-      for (i = 0; i < obj_names.length; i++) {
+      for (let i = 0; i < obj_names.length; i++) {
         checked_vars.push(obj_names[i]);
       }
     }
     // include decisions, if checked
     if (d3.select(checkbox_ids[1]).property("checked") === true) {
-      for (i = 0; i < dec_names.length; i++) {
+      for (let i = 0; i < dec_names.length; i++) {
         checked_vars.push(dec_names[i]);
       }
     }
@@ -142,11 +218,26 @@
     return checked_vars;
   }
 
-  // // update clustering
-  // function update_cluster_slider(nClust) {
-  //   // adjust the text on the range slider
-  //   d3.select("#nClust-value").text(nClust);
-  //   d3.select("#nClust").property("value", nClust);
-  // }
+  // update clustering
+  function update_cluster_slider(nClust) {
+    d3.select("#nClust-value").text(nClust);
+    d3.select("#nClust").property("value", nClust);
+  }
+
+  function get_checked_vars() {
+    const checked_vars = [];
+    const checkbox_ids = [...decisionsHeaders, ...objectivesHeaders];
+
+    for (let i = 0; i < checkbox_ids.length; i++) {
+      if (d3.select(`#${checkbox_ids[i]}`).property("checked") === true) {
+        checked_vars.push(checkbox_ids[i]);
+      }
+    }
+    return checked_vars;
+  }
+
+  const onChangeWeight = (field, value) => {
+    d3.select(`#${field.getAttribute('id')}`).property("value", value);
+  }
 
 </script>

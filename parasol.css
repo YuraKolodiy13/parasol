@@ -838,3 +838,12 @@ classes should alter those!
 .slick-columnpicker li a:hover {
     background: white;
 }
+#clusteringVars ul,
+#rangeList ul{
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    width: 100%;
+    margin: 0;
+    column-gap: 30px;
+}
