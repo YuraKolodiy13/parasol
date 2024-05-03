@@ -847,3 +847,13 @@ classes should alter those!
     margin: 0;
     column-gap: 30px;
 }
+#apply_weights{
+    margin-bottom: 30px;
+}
+.curveBundlingRange{
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    list-style: none;
+    margin: 0;
+}
